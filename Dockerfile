@@ -9,6 +9,4 @@ RUN pip install git+https://github.com/pragprogrammer/mcp-ynab.git
 # Install supergateway (bridges stdio -> HTTP/SSE)
 RUN npm install -g supergateway
 
-EXPOSE 8080
-
-CMD supergateway --stdio "mcp-ynab" --port ${PORT:-8080} --outputTransport streamable-http --oauth2Bearer ${MCP_AUTH_TOKEN}
+CMD supergateway --stdio "mcp-ynab" --port ${PORT:-8080} --oauth2Bearer ${MCP_AUTH_TOKEN}
