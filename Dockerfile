@@ -1,10 +1,10 @@
 FROM python:3.12-slim
 
-# Install Node.js (needed for supergateway)
-RUN apt-get update && apt-get install -y nodejs npm && rm -rf /var/lib/apt/lists/*
+# Install Node.js (needed for supergateway) and git (needed for pip install from GitHub)
+RUN apt-get update && apt-get install -y nodejs npm git && rm -rf /var/lib/apt/lists/*
 
-# Install mcp-ynab
-RUN pip install mcp-ynab==1.0.1
+# Install mcp-ynab from GitHub
+RUN pip install git+https://github.com/pragprogrammer/mcp-ynab.git
 
 # Install supergateway (bridges stdio -> HTTP/SSE)
 RUN npm install -g supergateway
