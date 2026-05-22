@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.13-slim
 
 # Install Node.js (needed for supergateway) and git (needed for pip install from GitHub)
 RUN apt-get update && apt-get install -y nodejs npm git && rm -rf /var/lib/apt/lists/*
