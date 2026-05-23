@@ -18,9 +18,11 @@ import time
 from urllib.parse import urlencode
 
 import uvicorn
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse, RedirectResponse
 from starlette.routing import Route
+from urllib.parse import urlparse
 
 from src.server import mcp
 
@@ -217,6 +219,13 @@ class BearerAuthOnMcp:
 
         await self.app(scope, receive, send)
 
+
+if PUBLIC_BASE_URL:
+    host = urlparse(PUBLIC_BASE_URL).netloc
+    mcp.settings.transport_security = TransportSecuritySettings(
+        allowed_hosts=[host, "localhost", "127.0.0.1"],
+        allowed_origins=[PUBLIC_BASE_URL, "http://localhost", "http://127.0.0.1"],
+    )
 
 app = mcp.streamable_http_app()
 
