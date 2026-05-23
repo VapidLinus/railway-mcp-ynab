@@ -1,12 +1,11 @@
 FROM python:3.13-slim
 
-# Install Node.js (needed for supergateway) and git (needed for pip install from GitHub)
-RUN apt-get update && apt-get install -y nodejs npm git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
-# Install mcp-ynab from GitHub
-RUN pip install git+https://github.com/pragprogrammer/mcp-ynab.git
+RUN pip install --no-cache-dir uvicorn "git+https://github.com/pragprogrammer/mcp-ynab.git"
 
-# Install supergateway (bridges stdio -> HTTP/SSE)
-RUN npm install -g supergateway
+WORKDIR /app
+COPY serve.py .
 
-CMD supergateway --stdio "mcp-ynab" --port ${PORT:-8080} --oauth2Bearer ${MCP_AUTH_TOKEN}
+EXPOSE 8080
+CMD ["python", "serve.py"]
