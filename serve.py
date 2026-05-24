@@ -17,6 +17,7 @@ import sys
 import time
 from urllib.parse import urlencode
 
+import jwt
 import uvicorn
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
@@ -32,7 +33,12 @@ CLIENT_SECRET = os.environ["OAUTH_CLIENT_SECRET"]
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
 
 CODE_TTL = 600
-TOKEN_TTL = 3600
+TOKEN_TTL = 30 * 24 * 3600  # 30 days
+
+# JWT signing key derived from CLIENT_SECRET: rotating the secret invalidates all tokens.
+TOKEN_SIGNING_KEY = hashlib.sha256(
+    b"mcp-ynab-token-signing:" + CLIENT_SECRET.encode()
+).hexdigest()
 
 
 def _log(*args):
@@ -40,7 +46,6 @@ def _log(*args):
 
 
 _codes: dict[str, dict] = {}
-_tokens: dict[str, float] = {}
 
 
 def _now() -> float:
@@ -51,8 +56,27 @@ def _gc():
     cutoff = _now()
     for k in [k for k, v in _codes.items() if v["expires_at"] < cutoff]:
         _codes.pop(k, None)
-    for k in [k for k, v in _tokens.items() if v < cutoff]:
-        _tokens.pop(k, None)
+
+
+def _issue_token() -> str:
+    now = int(_now())
+    payload = {
+        "iss": PUBLIC_BASE_URL or "mcp-ynab",
+        "sub": CLIENT_ID,
+        "iat": now,
+        "exp": now + TOKEN_TTL,
+    }
+    return jwt.encode(payload, TOKEN_SIGNING_KEY, algorithm="HS256")
+
+
+def _validate_token(token: str) -> bool:
+    if not token:
+        return False
+    try:
+        jwt.decode(token, TOKEN_SIGNING_KEY, algorithms=["HS256"])
+        return True
+    except jwt.InvalidTokenError:
+        return False
 
 
 def _base_url(request: Request) -> str:
@@ -170,9 +194,8 @@ async def token(request: Request):
         return JSONResponse({"error": "invalid_grant", "error_description": "PKCE verification failed"}, status_code=400)
 
     _gc()
-    access_token = secrets.token_urlsafe(32)
-    _tokens[access_token] = _now() + TOKEN_TTL
-    _log("token", "issued, ttl=", TOKEN_TTL)
+    access_token = _issue_token()
+    _log("token", "issued JWT, ttl=", TOKEN_TTL)
 
     return JSONResponse({
         "access_token": access_token,
@@ -199,8 +222,7 @@ class BearerAuthOnMcp:
         auth = headers.get("authorization", "")
         tok = auth[7:] if auth.lower().startswith("bearer ") else ""
 
-        expires_at = _tokens.get(tok)
-        if not expires_at or expires_at < _now():
+        if not _validate_token(tok):
             host = headers.get("host", "")
             scheme = scope.get("scheme") or "http"
             base = PUBLIC_BASE_URL or f"{scheme}://{host}"
